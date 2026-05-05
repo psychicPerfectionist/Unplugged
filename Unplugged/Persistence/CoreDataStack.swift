@@ -43,4 +43,16 @@ final class CoreDataStack {
     func newBackgroundContext() -> NSManagedObjectContext {
         container.newBackgroundContext()
     }
+
+    func deleteAllData() {
+        let context = viewContext
+        let entityNames = container.managedObjectModel.entities.compactMap { $0.name }
+        for name in entityNames {
+            let request = NSFetchRequest<NSFetchRequestResult>(entityName: name)
+            let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
+            _ = try? context.execute(deleteRequest)
+        }
+        context.reset()
+        save()
+    }
 }

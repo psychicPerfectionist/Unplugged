@@ -3,9 +3,16 @@ import Combine
 
 @MainActor
 final class LeaderboardViewModel: ObservableObject {
-    @Published private(set) var entries: [FriendEntry] = []
-    @Published private(set) var isLoading: Bool = false
-    @Published var error: AppError?
+    enum State {
+        case idle
+        case loading
+        case unavailable   // iCloud not signed in
+        case empty         // iCloud works but no friends yet
+        case loaded([FriendEntry])
+        case error(String)
+    }
+
+    @Published private(set) var state: State = .idle
 
     private var liveUpdateObserver: Any?
 
@@ -27,16 +34,27 @@ final class LeaderboardViewModel: ObservableObject {
         }
     }
 
+    // Legacy accessor for views that bind to entries array
+    var entries: [FriendEntry] {
+        if case .loaded(let e) = state { return e }
+        return []
+    }
+
+    var isLoading: Bool {
+        if case .loading = state { return true }
+        return false
+    }
+
     func refresh() async {
-        isLoading = true
-        defer { isLoading = false }
+        state = .loading
         do {
-            async let fetchEntries  = CloudKitService.shared.fetchLeaderboard()
-            async let setupSubscription: Void = CloudKitService.shared.subscribeToLeaderboardChanges()
-            entries = try await fetchEntries
-            try await setupSubscription
+            let fetched = try await CloudKitService.shared.fetchLeaderboard()
+            try? await CloudKitService.shared.subscribeToLeaderboardChanges()
+            state = fetched.isEmpty ? .empty : .loaded(fetched)
+        } catch AppError.cloudKitUnavailable {
+            state = .unavailable
         } catch {
-            self.error = .cloudKitFetchFailed(error)
+            state = .error(error.localizedDescription)
         }
     }
 
@@ -45,7 +63,7 @@ final class LeaderboardViewModel: ObservableObject {
             try await CloudKitService.shared.addFriend(iCloudID: iCloudID)
             await refresh()
         } catch {
-            self.error = .cloudKitFetchFailed(error)
+            state = .error(error.localizedDescription)
         }
     }
 }

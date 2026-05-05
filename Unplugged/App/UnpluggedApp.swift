@@ -42,7 +42,7 @@ private struct AppRoot: View {
             .environmentObject(settingsVM)
             .environmentObject(historyVM)
             .environment(\.screenTimeService, service)
-            .task { await NotificationService.shared.requestPermission() }
+            .task { _ = await NotificationService.shared.requestPermission() }
     }
 }
 

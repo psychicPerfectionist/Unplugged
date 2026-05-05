@@ -67,14 +67,12 @@ final class PluggieViewModel: ObservableObject {
         let previousLimit = dailyLimitSeconds
 
         // Persist the day that just ended before zeroing usage
-        Task {
-            let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
-            await historyVM?.saveEndOfDay(
-                date: yesterday,
-                totalUsageSeconds: previousUsage,
-                limitSeconds: previousLimit
-            )
-        }
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+        historyVM?.saveEndOfDay(
+            date: yesterday,
+            totalUsageSeconds: previousUsage,
+            limitSeconds: previousLimit
+        )
 
         currentUsageSeconds = 0
         notifiedNearDeath   = false

@@ -32,6 +32,21 @@ final class SettingsViewModel: ObservableObject {
         isAuthenticated = true
     }
 
+    func signOut() {
+        AuthService.shared.signOut()
+        isAuthenticated = false
+    }
+
+    func deleteAccount() {
+        AuthService.shared.deleteAccount()
+        CoreDataStack.shared.deleteAllData()
+        UserDefaults.standard.removeObject(forKey: "onboardingComplete")
+        UserDefaults.standard.removeObject(forKey: "reminderItems")
+        defaults.removeObject(forKey: AppGroupConstants.UserDefaultsKeys.dailyLimitSeconds)
+        isOnboardingComplete = false
+        isAuthenticated = false
+    }
+
     func save() {
         service.setDailyLimit(dailyLimitSeconds)
         defaults.set(dailyLimitSeconds, forKey: AppGroupConstants.UserDefaultsKeys.dailyLimitSeconds)

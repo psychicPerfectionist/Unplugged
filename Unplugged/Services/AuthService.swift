@@ -13,12 +13,18 @@ enum AuthError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidCredentials:      return "Incorrect email or password."
-        case .userNotFound:            return "No account found for that email."
-        case .userAlreadyExists:       return "An account with that email already exists."
-        case .keychainError(let s):    return "Keychain error (\(s))."
-        case .appleSignInFailed(let e): return "Apple Sign-In failed: \(e.localizedDescription)"
-        case .missingCredential:       return "Could not read credential from Apple."
+        case .invalidCredentials:
+            return "Incorrect email or password. Please try again."
+        case .userNotFound:
+            return "No account found for that email address. Please check and try again."
+        case .userAlreadyExists:
+            return "An account with that email already exists. Try signing in instead."
+        case .keychainError(let s):
+            return "A secure storage error occurred (code \(s)). Please try again."
+        case .appleSignInFailed(let e):
+            return "Apple Sign-In failed: \(e.localizedDescription)"
+        case .missingCredential:
+            return "Could not read your Apple ID credential. Please try again."
         }
     }
 }
@@ -44,50 +50,79 @@ final class AuthService {
         else { throw AuthError.missingCredential }
 
         let userID = credential.user
+
+        // Apple only sends fullName on first sign-in; preserve existing name on subsequent logins
         let name: String
         if let fullName = credential.fullName,
-           let given = fullName.givenName {
-            name = [given, fullName.familyName].compactMap { $0 }.joined(separator: " ")
+           let given = fullName.givenName, !given.isEmpty {
+            let full = [given, fullName.familyName].compactMap { $0 }.joined(separator: " ")
+            name = full
             save(string: name, key: .displayName)
         } else {
             name = readString(key: .displayName) ?? "Pluggie User"
         }
 
         save(string: userID, key: .userID)
-        save(string: name, key: .displayName)
+        if readString(key: .displayName) == nil {
+            save(string: name, key: .displayName)
+        }
 
         return UserProfile(id: userID, displayName: name)
     }
 
     func signInWithEmail(email: String, password: String) throws -> UserProfile {
-        guard let storedHash = readString(key: .passwordHash(email: email)) else {
+        let cleanEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
+        guard let storedHash = readString(key: .passwordHash(email: cleanEmail)) else {
             throw AuthError.userNotFound
         }
         guard hash(password) == storedHash else {
             throw AuthError.invalidCredentials
         }
-        let name = readString(key: .displayNameForEmail(email: email)) ?? email
-        let userID = "email-\(email)"
-        save(string: userID, key: .userID)
-        save(string: name, key: .displayName)
+        let name   = readString(key: .displayNameForEmail(email: cleanEmail)) ?? cleanEmail
+        let userID = "email-\(cleanEmail)"
+        save(string: userID,      key: .userID)
+        save(string: name,        key: .displayName)
+        save(string: cleanEmail,  key: .lastEmail)
         return UserProfile(id: userID, displayName: name)
     }
 
     func signUp(displayName: String, email: String, password: String) throws -> UserProfile {
-        if readString(key: .passwordHash(email: email)) != nil {
+        let cleanEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
+        if readString(key: .passwordHash(email: cleanEmail)) != nil {
             throw AuthError.userAlreadyExists
         }
-        save(string: hash(password), key: .passwordHash(email: email))
-        save(string: displayName, key: .displayNameForEmail(email: email))
-        let userID = "email-\(email)"
-        save(string: userID, key: .userID)
+        save(string: hash(password), key: .passwordHash(email: cleanEmail))
+        save(string: displayName,    key: .displayNameForEmail(email: cleanEmail))
+        let userID = "email-\(cleanEmail)"
+        save(string: userID,      key: .userID)
         save(string: displayName, key: .displayName)
+        save(string: cleanEmail,  key: .lastEmail)
         return UserProfile(id: userID, displayName: displayName)
+    }
+
+    func resetPassword(email: String, newPassword: String) throws {
+        let cleanEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
+        guard readString(key: .passwordHash(email: cleanEmail)) != nil else {
+            throw AuthError.userNotFound
+        }
+        save(string: hash(newPassword), key: .passwordHash(email: cleanEmail))
     }
 
     func signOut() {
         delete(key: .userID)
         delete(key: .displayName)
+        // Preserve credentials so user can sign back in
+    }
+
+    func deleteAccount() {
+        // Remove credentials for email-based accounts
+        if let email = readString(key: .lastEmail) {
+            delete(key: .passwordHash(email: email))
+            delete(key: .displayNameForEmail(email: email))
+        }
+        delete(key: .userID)
+        delete(key: .displayName)
+        delete(key: .lastEmail)
     }
 
     // MARK: - Keychain Keys
@@ -95,6 +130,7 @@ final class AuthService {
     private enum KeychainKey {
         case userID
         case displayName
+        case lastEmail
         case passwordHash(email: String)
         case displayNameForEmail(email: String)
 
@@ -102,6 +138,7 @@ final class AuthService {
             switch self {
             case .userID:                       return "com.unplugged.userID"
             case .displayName:                  return "com.unplugged.displayName"
+            case .lastEmail:                    return "com.unplugged.lastEmail"
             case .passwordHash(let e):          return "com.unplugged.pw.\(e)"
             case .displayNameForEmail(let e):   return "com.unplugged.name.\(e)"
             }
@@ -123,10 +160,10 @@ final class AuthService {
 
     private func readString(key: KeychainKey) -> String? {
         let query: [CFString: Any] = [
-            kSecClass:            kSecClassGenericPassword,
-            kSecAttrAccount:      key.value,
-            kSecReturnData:       true,
-            kSecMatchLimit:       kSecMatchLimitOne
+            kSecClass:       kSecClassGenericPassword,
+            kSecAttrAccount: key.value,
+            kSecReturnData:  true,
+            kSecMatchLimit:  kSecMatchLimitOne
         ]
         var result: AnyObject?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
@@ -143,7 +180,6 @@ final class AuthService {
     }
 
     private func hash(_ input: String) -> String {
-        let digest = SHA256.hash(data: Data(input.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: Data(input.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

@@ -1,7 +1,7 @@
 import Foundation
 
 enum AppGroupConstants {
-    static let suiteName = "group.com.unplugged"
+    static let suiteName = "group.com.thilothma.Unplugged"
 
     enum UserDefaultsKeys {
         static let currentHealthPercent  = "currentHealthPercent"

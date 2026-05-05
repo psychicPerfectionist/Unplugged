@@ -3,7 +3,7 @@
 // SETUP: In Xcode add this target manually:
 //   File → New Target → Device Activity Monitor Extension → Name: UnpluggedDeviceActivityMonitor
 //   Add this file to the new target.
-//   Add the same App Group "group.com.unplugged" capability to the new target.
+//   Add the same App Group "group.com.thilothma.Unplugged" capability to the new target.
 //   Add the Shared/ folder (AppGroupConstants.swift) to the new target.
 //
 // This extension runs as a separate process. It cannot call back into the main app
@@ -22,7 +22,7 @@ import Foundation
 @objc(DeviceActivityMonitorExtension)
 class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
-    private let defaults = UserDefaults(suiteName: "group.com.unplugged")!
+    private let defaults = UserDefaults(suiteName: "group.com.thilothma.Unplugged")!
 
     // Called at the end of each DeviceActivitySchedule interval (every minute by default).
     override func intervalDidEnd(for activity: DeviceActivityName) {

@@ -13,6 +13,9 @@ struct HistoryView: View {
                 VStack(spacing: 20) {
                     streakRow
                     calendarGrid
+                    if vm.records.isEmpty {
+                        emptyState
+                    }
                 }
                 .padding()
             }
@@ -22,6 +25,22 @@ struct HistoryView: View {
                 DayDetailSheet(record: record)
             }
         }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+            Text("No history yet")
+                .font(.headline)
+            Text("Each day you use the app, a record is saved here. Green means Pluggie survived, grey means he didn't.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .padding(.vertical, 24)
     }
 
     private var streakRow: some View {

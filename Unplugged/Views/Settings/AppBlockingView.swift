@@ -2,48 +2,62 @@ import SwiftUI
 
 struct AppBlockingView: View {
     @EnvironmentObject private var pluggieVM: PluggieViewModel
-    @State private var showPicker = false
 
     var body: some View {
         List {
-            Section {
-                Toggle("Block selected apps", isOn: Binding(
-                    get: { pluggieVM.isBlockingActive },
-                    set: {
-                        pluggieVM.setBlockingActive($0)
-                        HapticsService.shared.impactMedium()
-                    }
-                ))
-            } footer: {
-                Text("While app blocking is active, Pluggie's health timer is paused.")
-            }
-
-            Section("Selected Apps") {
-                Button("Choose Apps…") { showPicker = true }
-                    .sheet(isPresented: $showPicker) {
-                        FamilyActivityPickerPlaceholder()
-                    }
-            }
+            timerSection
+            appSelectionSection
         }
         .navigationTitle("Block Apps")
         .navigationBarTitleDisplayMode(.inline)
     }
-}
 
-private struct FamilyActivityPickerPlaceholder: View {
-    @Environment(\.dismiss) private var dismiss
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView(
-                "Requires Device",
-                systemImage: "iphone.slash",
-                description: Text("FamilyActivityPicker runs only on a real device with the com.apple.developer.family-controls entitlement.")
-            )
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+    // MARK: - Timer Pause Toggle
+
+    private var timerSection: some View {
+        Section {
+            Toggle(isOn: Binding(
+                get: { pluggieVM.isBlockingActive },
+                set: {
+                    pluggieVM.setBlockingActive($0)
+                    HapticsService.shared.impactMedium()
+                }
+            )) {
+                Label(
+                    pluggieVM.isBlockingActive ? "Timer paused" : "Pause timer",
+                    systemImage: pluggieVM.isBlockingActive ? "pause.circle.fill" : "pause.circle"
+                )
+            }
+            .tint(Color(hex: "#5C6BC0"))
+        } header: {
+            Text("Screen Time Timer")
+        } footer: {
+            Text("While paused, Pluggie's health stops dropping. Use this when you need focused time without being penalised.")
+        }
+    }
+
+    // MARK: - App Selection (device-only)
+
+    private var appSelectionSection: some View {
+        Section {
+            HStack(spacing: 12) {
+                Image(systemName: "iphone")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Real Device Required")
+                        .font(.subheadline.bold())
+                    Text("Selecting specific apps to block uses Apple's Screen Time API, which requires a physical iPhone and the Family Controls entitlement.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Choose Apps to Block")
+        } footer: {
+            Text("On a real device with the entitlement provisioned, you would see a system picker here to choose exactly which apps get locked.")
         }
     }
 }

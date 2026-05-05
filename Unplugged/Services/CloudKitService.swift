@@ -4,7 +4,7 @@ import Foundation
 final class CloudKitService {
     static let shared = CloudKitService()
 
-    private let container = CKContainer.default()
+    private let container = CKContainer(identifier: "iCloud.com.thilothma.Unplugged")
     private var publicDB: CKDatabase { container.publicCloudDatabase }
     private var privateDB: CKDatabase { container.privateCloudDatabase }
 

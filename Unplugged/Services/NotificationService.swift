@@ -6,14 +6,19 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
     private override init() {}
 
+    // MARK: - Permission
+
+    @discardableResult
     func requestPermission() async -> Bool {
         (try? await UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .sound, .badge]
         )) ?? false
     }
 
-    /// Schedules a recurring reminder at the given interval.
-    /// Pass 0 to cancel all pending reminders.
+    // MARK: - Interval Reminder (legacy — used by Settings picker)
+
+    /// Replaces any existing interval-based reminder with a new one.
+    /// Pass 0 to cancel.
     func scheduleReminder(intervalMinutes: Int) {
         UNUserNotificationCenter.current().removePendingNotificationRequests(
             withIdentifiers: ["com.unplugged.reminder"]
@@ -22,22 +27,42 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
         let content = UNMutableNotificationContent()
         content.title = "Unplugged Reminder"
-        content.body  = "Check your screen time usage."
+        content.body  = "Check in on Pluggie — how's your screen time today?"
         content.sound = .default
 
         let trigger = UNTimeIntervalNotificationTrigger(
             timeInterval: TimeInterval(intervalMinutes * 60),
             repeats: true
         )
-        let request = UNNotificationRequest(
-            identifier: "com.unplugged.reminder",
-            content: content,
-            trigger: trigger
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "com.unplugged.reminder", content: content, trigger: trigger)
         )
-        UNUserNotificationCenter.current().add(request)
     }
 
-    /// Fires immediately when usage hits ~90% of the daily limit.
+    // MARK: - Time-of-Day Reminders
+
+    func scheduleTimeOfDayReminder(_ item: ReminderItem) {
+        let content = UNMutableNotificationContent()
+        content.title = "Unplugged"
+        content.body  = item.label.isEmpty ? "Check in on Pluggie — how's your screen time?" : item.label
+        content.sound = .default
+
+        var components    = DateComponents()
+        components.hour   = item.hour
+        components.minute = item.minute
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: item.notificationID, content: content, trigger: trigger)
+        )
+    }
+
+    func cancelReminder(id: String) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id])
+    }
+
+    // MARK: - Health Threshold Notifications
+
     func fireNearDeathWarning(percent: Int) {
         let content = UNMutableNotificationContent()
         content.title = "⚠️ Pluggie is struggling!"
@@ -45,28 +70,21 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         content.sound = .default
         content.interruptionLevel = .timeSensitive
 
-        let request = UNNotificationRequest(
-            identifier: "com.unplugged.nearDeath",
-            content: content,
-            trigger: nil
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "com.unplugged.nearDeath", content: content, trigger: nil)
         )
-        UNUserNotificationCenter.current().add(request)
     }
 
-    /// Fires immediately when usage reaches 100% — Pluggie dies.
     func fireDeath() {
         let content = UNMutableNotificationContent()
         content.title = "💀 Pluggie has died!"
         content.body  = "You exceeded your daily screen time limit. Your friends have been notified."
-        content.sound = UNNotificationSound.defaultCritical
+        content.sound = .defaultCritical
         content.interruptionLevel = .critical
 
-        let request = UNNotificationRequest(
-            identifier: "com.unplugged.death",
-            content: content,
-            trigger: nil
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "com.unplugged.death", content: content, trigger: nil)
         )
-        UNUserNotificationCenter.current().add(request)
     }
 
     // MARK: - Delegate
