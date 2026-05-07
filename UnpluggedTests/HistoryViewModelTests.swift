@@ -10,17 +10,17 @@ final class HistoryViewModelTests: XCTestCase {
 
     var vm: HistoryViewModel!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         CoreDataStack.shared.deleteAllData()
         vm = HistoryViewModel()
         vm.load()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         CoreDataStack.shared.deleteAllData()
         vm = nil
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - Helpers
@@ -37,57 +37,57 @@ final class HistoryViewModelTests: XCTestCase {
 
     // MARK: - Load
 
-    func testInitialRecordsIsEmpty() {
+    func testInitialRecordsIsEmpty() async throws {
         XCTAssertTrue(vm.records.isEmpty)
     }
 
-    func testInitialCurrentStreakIsZero() {
+    func testInitialCurrentStreakIsZero() async throws {
         XCTAssertEqual(vm.currentStreak, 0)
     }
 
-    func testInitialBestStreakIsZero() {
+    func testInitialBestStreakIsZero() async throws {
         XCTAssertEqual(vm.bestStreak, 0)
     }
 
     // MARK: - saveEndOfDay
 
-    func testSaveCreatesRecord() {
+    func testSaveCreatesRecord() async throws {
         saveDay(daysAgo: 1, usage: 1800)
         vm.load()
         XCTAssertEqual(vm.records.count, 1)
     }
 
-    func testSaveMarksAsSurvivedWhenUnderLimit() {
+    func testSaveMarksAsSurvivedWhenUnderLimit() async throws {
         saveDay(daysAgo: 1, usage: 1800, limit: 3600)
         vm.load()
         XCTAssertTrue(vm.records.first?.survived ?? false)
     }
 
-    func testSaveMarksAsFailedWhenOverLimit() {
+    func testSaveMarksAsFailedWhenOverLimit() async throws {
         saveDay(daysAgo: 1, usage: 4000, limit: 3600)
         vm.load()
         XCTAssertFalse(vm.records.first?.survived ?? true)
     }
 
-    func testSaveAtExactLimitCountsAsSurvived() {
+    func testSaveAtExactLimitCountsAsSurvived() async throws {
         saveDay(daysAgo: 1, usage: 3600, limit: 3600)
         vm.load()
         XCTAssertTrue(vm.records.first?.survived ?? false)
     }
 
-    func testSavePreservesUsageSeconds() {
+    func testSavePreservesUsageSeconds() async throws {
         saveDay(daysAgo: 1, usage: 2500)
         vm.load()
         XCTAssertEqual(vm.records.first?.totalUsageSeconds, 2500)
     }
 
-    func testSavePreservesLimitSeconds() {
+    func testSavePreservesLimitSeconds() async throws {
         saveDay(daysAgo: 1, usage: 1800, limit: 5400)
         vm.load()
         XCTAssertEqual(vm.records.first?.limitSeconds, 5400)
     }
 
-    func testSaveOnSameDayUpdatesExistingRecord() {
+    func testSaveOnSameDayUpdatesExistingRecord() async throws {
         saveDay(daysAgo: 1, usage: 1800)
         saveDay(daysAgo: 1, usage: 2400)  // overwrite
         vm.load()
@@ -97,18 +97,18 @@ final class HistoryViewModelTests: XCTestCase {
 
     // MARK: - record(for:)
 
-    func testRecordForDateReturnsNilWhenEmpty() {
+    func testRecordForDateReturnsNilWhenEmpty() async throws {
         XCTAssertNil(vm.record(for: date(daysAgo: 1)))
     }
 
-    func testRecordForDateFindsExistingRecord() {
+    func testRecordForDateFindsExistingRecord() async throws {
         let target = date(daysAgo: 1)
         saveDay(daysAgo: 1, usage: 1800)
         vm.load()
         XCTAssertNotNil(vm.record(for: target))
     }
 
-    func testRecordForDateReturnsNilForDifferentDate() {
+    func testRecordForDateReturnsNilForDifferentDate() async throws {
         saveDay(daysAgo: 2, usage: 1800)
         vm.load()
         XCTAssertNil(vm.record(for: date(daysAgo: 99)))
@@ -116,38 +116,38 @@ final class HistoryViewModelTests: XCTestCase {
 
     // MARK: - Streak: current streak
 
-    func testCurrentStreakIsOneAfterOneSurvivedYesterday() {
+    func testCurrentStreakIsOneAfterOneSurvivedYesterday() async throws {
         saveDay(daysAgo: 1, usage: 1800)
         XCTAssertEqual(vm.currentStreak, 1)
     }
 
-    func testCurrentStreakIsZeroAfterOneFailedYesterday() {
+    func testCurrentStreakIsZeroAfterOneFailedYesterday() async throws {
         saveDay(daysAgo: 1, usage: 4000)
         XCTAssertEqual(vm.currentStreak, 0)
     }
 
-    func testCurrentStreakCountsThreeConsecutiveSurvivedDays() {
+    func testCurrentStreakCountsThreeConsecutiveSurvivedDays() async throws {
         saveDay(daysAgo: 1, usage: 1800)
         saveDay(daysAgo: 2, usage: 1800)
         saveDay(daysAgo: 3, usage: 1800)
         XCTAssertEqual(vm.currentStreak, 3)
     }
 
-    func testCurrentStreakBreaksOnFailedDay() {
+    func testCurrentStreakBreaksOnFailedDay() async throws {
         saveDay(daysAgo: 1, usage: 1800)   // survived
         saveDay(daysAgo: 2, usage: 4000)   // failed — breaks streak
         saveDay(daysAgo: 3, usage: 1800)   // survived (before break)
         XCTAssertEqual(vm.currentStreak, 1)
     }
 
-    func testCurrentStreakIsZeroWhenOnlyTodaySaved() {
-        // Records saved for "today" (daysAgo: 0) should not count toward yesterday's streak
+    func testCurrentStreakIsZeroWhenOnlyTodaySaved() async throws {
+        // Records for "today" (daysAgo: 0) should not count toward yesterday's streak
         vm.saveEndOfDay(date: Date(), totalUsageSeconds: 1800, limitSeconds: 3600)
         // Streak counts backward from yesterday; today's record doesn't match expectedDate
         XCTAssertEqual(vm.currentStreak, 0)
     }
 
-    func testCurrentStreakBreaksOnMissingDay() {
+    func testCurrentStreakBreaksOnMissingDay() async throws {
         // Gap at daysAgo: 2 means streak stops after daysAgo: 1
         saveDay(daysAgo: 1, usage: 1800)
         saveDay(daysAgo: 3, usage: 1800)   // day 2 is missing
@@ -156,13 +156,13 @@ final class HistoryViewModelTests: XCTestCase {
 
     // MARK: - Streak: best streak
 
-    func testBestStreakMatchesCurrentStreakWhenNoPreviousBest() {
+    func testBestStreakMatchesCurrentStreakWhenNoPreviousBest() async throws {
         saveDay(daysAgo: 1, usage: 1800)
         saveDay(daysAgo: 2, usage: 1800)
         XCTAssertGreaterThanOrEqual(vm.bestStreak, 2)
     }
 
-    func testBestStreakIsPreservedAfterStreakBreaks() {
+    func testBestStreakIsPreservedAfterStreakBreaks() async throws {
         // Build a streak of 3
         saveDay(daysAgo: 1, usage: 1800)
         saveDay(daysAgo: 2, usage: 1800)

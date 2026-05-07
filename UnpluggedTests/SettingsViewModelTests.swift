@@ -7,9 +7,8 @@ final class SettingsViewModelTests: XCTestCase {
     var vm: SettingsViewModel!
     var service: MockScreenTimeService!
 
-    override func setUp() {
-        super.setUp()
-        // Reset all persisted state
+    override func setUp() async throws {
+        try await super.setUp()
         UserDefaults.standard.removeObject(forKey: "onboardingComplete")
         UserDefaults.standard.removeObject(forKey: "reminderItems")
         AuthService.shared.deleteAccount()
@@ -18,32 +17,32 @@ final class SettingsViewModelTests: XCTestCase {
         vm = SettingsViewModel(service: service)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         UserDefaults.standard.removeObject(forKey: "onboardingComplete")
         UserDefaults.standard.removeObject(forKey: "reminderItems")
         AuthService.shared.deleteAccount()
         vm = nil
         service = nil
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - Onboarding
 
-    func testInitialOnboardingIsFalseWhenKeyMissing() {
+    func testInitialOnboardingIsFalseWhenKeyMissing() async throws {
         XCTAssertFalse(vm.isOnboardingComplete)
     }
 
-    func testCompleteOnboardingSetsFlag() {
+    func testCompleteOnboardingSetsFlag() async throws {
         vm.completeOnboarding()
         XCTAssertTrue(vm.isOnboardingComplete)
     }
 
-    func testCompleteOnboardingPersistsToUserDefaults() {
+    func testCompleteOnboardingPersistsToUserDefaults() async throws {
         vm.completeOnboarding()
         XCTAssertTrue(UserDefaults.standard.bool(forKey: "onboardingComplete"))
     }
 
-    func testNewVMReadsPersistedOnboardingState() {
+    func testNewVMReadsPersistedOnboardingState() async throws {
         vm.completeOnboarding()
         let newVM = SettingsViewModel(service: service)
         XCTAssertTrue(newVM.isOnboardingComplete)
@@ -51,16 +50,16 @@ final class SettingsViewModelTests: XCTestCase {
 
     // MARK: - Authentication state
 
-    func testInitialAuthenticationStateMatchesAuthService() {
+    func testInitialAuthenticationStateMatchesAuthService() async throws {
         XCTAssertFalse(vm.isAuthenticated)
     }
 
-    func testMarkAuthenticatedSetsFlag() {
+    func testMarkAuthenticatedSetsFlag() async throws {
         vm.markAuthenticated()
         XCTAssertTrue(vm.isAuthenticated)
     }
 
-    func testSignOutClearsAuthenticationFlag() {
+    func testSignOutClearsAuthenticationFlag() async throws {
         vm.markAuthenticated()
         vm.signOut()
         XCTAssertFalse(vm.isAuthenticated)
@@ -68,36 +67,36 @@ final class SettingsViewModelTests: XCTestCase {
 
     // MARK: - Daily limit initialisation
 
-    func testInitialDailyLimitMatchesService() {
+    func testInitialDailyLimitMatchesService() async throws {
         XCTAssertEqual(vm.dailyLimitSeconds, service.dailyLimitSeconds)
     }
 
-    func testDailyLimitCanBeUpdated() {
+    func testDailyLimitCanBeUpdated() async throws {
         vm.dailyLimitSeconds = 7200
         XCTAssertEqual(vm.dailyLimitSeconds, 7200)
     }
 
     // MARK: - Delete account
 
-    func testDeleteAccountClearsOnboardingFlag() {
+    func testDeleteAccountClearsOnboardingFlag() async throws {
         vm.completeOnboarding()
         vm.deleteAccount()
         XCTAssertFalse(vm.isOnboardingComplete)
     }
 
-    func testDeleteAccountClearsAuthenticationFlag() {
+    func testDeleteAccountClearsAuthenticationFlag() async throws {
         vm.markAuthenticated()
         vm.deleteAccount()
         XCTAssertFalse(vm.isAuthenticated)
     }
 
-    func testDeleteAccountRemovesOnboardingFromUserDefaults() {
+    func testDeleteAccountRemovesOnboardingFromUserDefaults() async throws {
         vm.completeOnboarding()
         vm.deleteAccount()
         XCTAssertFalse(UserDefaults.standard.bool(forKey: "onboardingComplete"))
     }
 
-    func testDeleteAccountRemovesRemindersFromUserDefaults() {
+    func testDeleteAccountRemovesRemindersFromUserDefaults() async throws {
         let item = ReminderItem(id: "x", label: "Test", hour: 8, minute: 0)
         ReminderItem.saveAll([item])
 
@@ -106,7 +105,7 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertTrue(ReminderItem.loadAll().isEmpty)
     }
 
-    func testDeleteAccountPreventsReloginViaAuthService() throws {
+    func testDeleteAccountPreventsReloginViaAuthService() async throws {
         _ = try AuthService.shared.signUp(displayName: "Test", email: "del@test.com", password: "pass")
         vm.markAuthenticated()
         vm.deleteAccount()
@@ -116,11 +115,11 @@ final class SettingsViewModelTests: XCTestCase {
 
     // MARK: - Notification interval
 
-    func testDefaultNotificationIntervalIs30() {
+    func testDefaultNotificationIntervalIs30() async throws {
         XCTAssertEqual(vm.notificationIntervalMinutes, 30)
     }
 
-    func testNotificationIntervalCanBeUpdated() {
+    func testNotificationIntervalCanBeUpdated() async throws {
         vm.notificationIntervalMinutes = 60
         XCTAssertEqual(vm.notificationIntervalMinutes, 60)
     }
